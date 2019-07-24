@@ -52,7 +52,7 @@ git clone https://github.com/XelaNull/docker-c7-zimbra
 
 ## Edit Dockerfile Variables
 
-There are half-a-dozen variables written into the top of the Dockerfile that may need adjusting. Edit the Dockerfile and adjust the few variables at the top, then proceed on to building your image.
+Your Zimbra Admin Password, timezone, and system memory should be set within the Dockerfile. Edit the Dockerfile and adjust the few variables at the top, then proceed on to building your image.
 
 ```
 cd docker-c7-zimbra
