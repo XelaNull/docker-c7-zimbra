@@ -10,7 +10,6 @@ ENV TIMEZONEID=America/New_York
 ENV PASSWORD=Sup3rS3cr3tM41lP4ssw0rd!
 # This variable should contain all network ranges that this server and your servers reside on
 # For most, the defaults set here probably would suffice.
-# ENV MTANETWORKS="127.0.0.0/8 172.17.0.0/16 10.0.0.0/16 192.168.0.0/8 [::1]/128 [fe80::]/64"
 ENV MTANETWORKS="127.0.0.0/8 172.17.0.0/16 10.0.0.0/16 192.168.0.0/8"
 # Amount of system memory(in GB) to expect to be able to provide to Zimbra. 3.8 = 4GB
 ENV SYSTEMMEMORY=3.8
