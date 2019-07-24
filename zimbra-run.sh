@@ -156,8 +156,9 @@ EOF
     kill -9 `ps awwx | grep cron | grep -v grep | awk '{print $1}'`; sleep 5
     for i in {1..2}; do echo "------------------------------------------" >> $DOCKER_SYSTEMLOGS; done
     echo "zimbra-run: COMPLETED INSTALLATION & INITIAL CONFIGURATION OF ZIMBRA" >> $DOCKER_SYSTEMLOGS
-    echo "---" >> $DOCKER_SYSTEMLOGS; echo "Zimbra Admin URL: https://$HOSTNAME.$DOMAIN:7071" >> $DOCKER_SYSTEMLOGS
-    echo "Zimbra Webmail URL: https://$HOSTNAME.$DOMAIN" >> $DOCKER_SYSTEMLOGS
+    echo "---" >> $DOCKER_SYSTEMLOGS; echo "Zimbra Webmail URL: https://$HOSTNAME.$DOMAIN" >> $DOCKER_SYSTEMLOGS
+    echo "Zimbra Admin URL: https://$HOSTNAME.$DOMAIN:7071" >> $DOCKER_SYSTEMLOGS
+    echo "Zimbra Password: $PASSWORD" >> $DOCKER_SYSTEMLOGS
     echo "---"  >> $DOCKER_SYSTEMLOGS; echo "zimbra-run: You may now hit CTRL-C to stop this running Docker image. Then issue your 'docker start' command to restart it in the background." >> $DOCKER_SYSTEMLOGS
 fi
 
