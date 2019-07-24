@@ -1,27 +1,32 @@
 #!/bin/bash
+
+# Declare Start/Stop Function
+function stop_start() {
+  # Fix any permissions issues that might exist
+  /opt/zimbra/libexec/zmfixperms
+  echo "zimbra-run: Stopping Zimbra.." >> $DOCKER_SYSTEMLOGS
+  su - zimbra -c "zmcontrol stop && sleep 5"  >> $DOCKER_SYSTEMLOGS
+  # Make *SURE* all Zimbra processes are killed. A hung process would mean on restart it would not start cleanly.
+  pkill -u zimbra
+  echo "zimbra-run: Re-Starting Zimbra, LDAP First..!" >> $DOCKER_SYSTEMLOGS
+  su - zimbra -c "zmcontrol start" >> $DOCKER_SYSTEMLOGS
+}
+
+# MAIN LOOP:
 # Install Zimbra if it isn't already installed
 if [[ -z $(ls -A /opt/zimbra) ]]; then sleep 3
-    echo "******************************************" >> $DOCKER_SYSTEMLOGS
-    echo "******************************************" >> $DOCKER_SYSTEMLOGS
-    echo "******************************************" >> $DOCKER_SYSTEMLOGS
-    echo "INSTALLING ZIMBRA COLLABORATION SOFTWARE..";
+    for i in {1..3}; do echo "******************************************" >> $DOCKER_SYSTEMLOGS; done
+    echo "INSTALLING ZIMBRA COLLABORATION SOFTWARE.." >> $DOCKER_SYSTEMLOGS;
     # Download Zimbra to our pre-installation staging directory
     PREINSTALL_DIR=/opt/zimbra-install
     CONFIGSCRIPT=$PREINSTALL_DIR/installZimbraScript
+    # Disable IPv6 Entries in /etc/hosts
+    cp /etc/hosts /etc/hosts2 && sed -i '2,6d' /etc/hosts2 && yes | cp /etc/hosts2 /etc/hosts
     
-    mkdir $PREINSTALL_DIR
     wget -O $PREINSTALL_DIR/zimbra-zcs.tar.gz $ZIMBRAURL
     tar xzvf $PREINSTALL_DIR/zimbra-zcs.tar.gz -C $PREINSTALL_DIR/
-    
-    # These next two are not mandatory, but I've chosen to at least include them
-    # these are to help facilitate migration between Zimbra servers with community edition
-    # IMAPCopy - http://www.ardiehl.de/imapcopy/
-    #cd /root && wget http://www.ardiehl.de/imapcopy/imapcopy.tar.gz && tar zxvf imapcopy.tar.gz
-    #zExtras Suite - TCP 8735 & 8736 - https://wiki.zextras.com/wiki/ZeXtras_Suite_Installation_Guide
-    #cd /root && wget http://download.zextras.com/zextras_suite-latest.tgz && tar zxvf zextras_suite-latest.tgz
-    # cd zextras-suite*; ./install.sh all
 
-    echo "Creating Zimbra keystrokes (Auto-response) file" && \
+    echo "zimbra-run: Creating Zimbra keystrokes (Auto-response) file" >> $DOCKER_SYSTEMLOGS && \
         printf "y\ny\ny\ny\ny\nn\ny\ny\ny\ny\ny\ny\ny\ny\nn\ny" > $PREINSTALL_DIR/installZimbra-keystrokes
         
     RANDOMHAM=$(date +%s|sha256sum|base64|head -c 10); sleep 1
@@ -134,71 +139,35 @@ zimbra_server_hostname="$HOSTNAME.$DOMAIN"
 INSTALL_PACKAGES="zimbra-core zimbra-ldap zimbra-logger zimbra-mta zimbra-snmp zimbra-store zimbra-apache zimbra-spell zimbra-memcached zimbra-proxy"
 EOF
 
-    echo "zimbra-run: Running zimbra-run.sh Installer.." >> $DOCKER_SYSTEMLOGS
+    echo "zimbra-run: Running install.sh Zimbra Installer.." >> $DOCKER_SYSTEMLOGS
     cd $PREINSTALL_DIR/zcs-* && ./install.sh -s < $PREINSTALL_DIR/installZimbra-keystrokes >> $DOCKER_SYSTEMLOGS
 
+    # BUGFIX: Docker-based Zimbra has bug with zmcontrol not properly starting LDAP service first.
+    # This bugfix injects a manual ldap start right before the 'zmcontrol start' command is issued.
+    # This ensures LDAP is started first and all services starting after it have this dependency met.
+    linenum=`grep -rne 'zmcontrol stop' /opt/zimbra/libexec/zmsetup.pl | cut -d: -f1`
+    LINE_TO_INSERT_AT=`expr $linenum + 1`
+    sed -i "${LINE_TO_INSERT_AT}i runAsZimbra (\"~/bin/ldap start\");" /opt/zimbra/libexec/zmsetup.pl
+    
+    # Executing zmsetup.pl
     echo "zimbra-run: Running zmsetup.pl.." >> $DOCKER_SYSTEMLOGS
     /opt/zimbra/libexec/zmsetup.pl -c $PREINSTALL_DIR/installZimbraScript >> $DOCKER_SYSTEMLOGS
-    
-    echo "zimbra-run: The above, may show failed zimlet installations. Not to worry, we're going to reinstall them in another minute!" >> $DOCKER_SYSTEMLOGS
-    sleep 30
-    start_zimbra "Starting Zimbra"
-    
-    echo "------------------------------------------" >> $DOCKER_SYSTEMLOGS
-    echo "------------------------------------------" >> $DOCKER_SYSTEMLOGS    
-    echo "zimbra-run: Setting Zimlets to Automatically Install in 60 seconds.." >> $DOCKER_SYSTEMLOGS
-    echo "for A in /opt/zimbra/zimlets/*; do" > /install_zimlets.sh && \
-    echo "  su - zimbra -c \"zmzimletctl deploy \$A\" >> $DOCKER_SYSTEMLOGS;" >> /install_zimlets.sh && \
-    echo "done" >> /install_zimlets.sh && \
-    echo 'echo "******************************************" >> $DOCKER_SYSTEMLOGS' >> /install_zimlets.sh && \
-    echo 'echo "******************************************" >> $DOCKER_SYSTEMLOGS' >> /install_zimlets.sh && \ 
-    echo 'echo "******************************************" >> $DOCKER_SYSTEMLOGS' >> /install_zimlets.sh && \
-    echo 'echo "zimbra-run: Zimbra installed successfully." >> $DOCKER_SYSTEMLOGS' >> /install_zimlets.sh && \
-    chmod a+x /install_zimlets.sh
-    
-    echo "zimbra-run: Now, we're going to reinstall the GAL sync account.." >> $DOCKER_SYSTEMLOGS
-    su - zimbra -c "zmgsautil createAccount -a galsync.$RANDOMGALSYNC@$DOMAIN -n InternalGAL --domain $DOMAIN -s $HOSTNAME.$DOMAIN -t zimbra -f _InternalGAL"
-    su - zimbra -c "zmgsautil forceSync -a galsync.$RANDOMGALSYNC@$DOMAIN -n InternalGAL"
-    
-    echo "------------------------------------------" >> $DOCKER_SYSTEMLOGS
-    echo "------------------------------------------" >> $DOCKER_SYSTEMLOGS
-    echo "zimbra-run: Completed Main Segment of Zimbra Install. Final Zimlet installation step will take up to 5 more minutes." >> $DOCKER_SYSTEMLOGS
-    
-    kill -9 `ps awwx | grep cron | grep -v grep | awk '{print $1}'`
-    # Sleep for 5 minutes to ensure all processes start up properly, before loop condition starts
-    sleep 300;
-    echo "zimbra-run: Sleeping for 5 minutes before beginning loop." >> $DOCKER_SYSTEMLOGS
+
+    kill -9 `ps awwx | grep cron | grep -v grep | awk '{print $1}'`; sleep 3
+    for i in {1..2}; do echo "------------------------------------------" >> $DOCKER_SYSTEMLOGS; done
+    echo "zimbra-run: COMPLETED INSTALLATION & INITIAL CONFIGURATION OF ZIMBRA" >> $DOCKER_SYSTEMLOGS
+    Whecho "zimbra-run: You may now hit CTRL-C to stop this running Docker image. Then issue your 'docker start' command to restart it in the background." >> $DOCKER_SYSTEMLOGS
 fi
-
-function start_zimbra() {
-# Fix any permissions issues that might exist
-/opt/zimbra/libexec/zmfixperms;
-
-# Start LDAP First
-su - zimbra -c "ldap start && sleep 3 && zmcontrol start && echo \"zimbra-run: STARTED $1\" >> $DOCKER_SYSTEMLOGS"  
-}
-
-function stop_start() {
-# Fix any permissions issues that might exist
-/opt/zimbra/libexec/zmfixperms;
-# Stop Zimbra
-su - zimbra -c "zmcontrol stop && sleep 3 && echo \"$(date +%Y-%m-%d_%H:%i:%s) zimbra-run: STOPPED $1\" >> $DOCKER_SYSTEMLOGS";
-# Start LDAP First
-su - zimbra -c "ldap start && sleep 3 && zmcontrol start && echo \"zimbra-run: STARTED $1\" >> $DOCKER_SYSTEMLOGS";
-}
 
 if [[ $1 == "-d" ]]; then
 while :; do
-    RESULT=`su - zimbra -c "zmcontrol status | grep -v $(hostname | tr '[:upper:]' '[:lower:]') | grep -v Running"`;
+    RESULT=`su - zimbra -c "zmcontrol status | grep -v zmconfigd | grep -v $(hostname | tr '[:upper:]' '[:lower:]') | grep -v Running"`;
     if [[ "$RESULT" != "" ]]; then
-        echo "One or more Zimbra services detected as not running. Automatically restarting.";
-        echo "zimbra-run: Automatically Restarting Zimbra due to service failure: $RESULT" >> $DOCKER_SYSTEMLOGS;
-        stop_start "Auto-Restart due to service failure: $RESULT";
-    else
-      if [[ ! -f /INSTALLED_ZIMLETS ]]; then
-        /install_zimlets.sh &
-        touch /INSTALLED_ZIMLETS
-      fi
+        ZMCONTROL_RUNNING=`ps awwux | grep zmcontrol | grep -v grep`
+        if [[ "$ZMCONTROL_RUNNING" == "" ]]; then # Only restart Zimbra if we aren't already performing a zmcontrol function
+          echo "zimbra-run: Automatically Restarting Zimbra due to service failure: $RESULT" >> $DOCKER_SYSTEMLOGS;
+          stop_start "Auto-Restart due to service failure: $RESULT";
+        fi
     fi
     sleep 300
 done
