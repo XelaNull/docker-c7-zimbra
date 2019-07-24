@@ -1,30 +1,40 @@
-# Docker CentOS 7 Zimbra
+# Docker CentOS 7 Zimbra 8.8
 
-This goal of this project is to make it simple and easy for anyone to create their own CentOS 7 based Zimbra server utilizing Docker container technology. This Docker image does contain an automated backup script.
+This goal of this project is to make it simple and easy for anyone to create their own CentOS 7 Zimbra server utilizing Docker container technology. This Docker image contains both **Cron** and an **automated backup script**. **Zimbra requires Cron** for its many built-in automated scheduled tasks. Any Zimbra Docker image without Cron, is missing a critical ingredient for a fully functional Zimbra system. Zimbra Rocks! Build, Run, and Enjoy.
 
 ## Features
 
 - Fix for Zimlet installation & GALSYNC account creation failure during Zimbra install
 - Fix for zmconfigd stopping or not starting, through disabling of IPv6
-- Auto-Restart of single service if it is found stopped
+- Auto-Restart of a single service if it is found stopped
 - Auto-Restart of all services if more than one is found stopped
-- Built-In Automated Zimbra Backups
-- Built-In Syslog-NG & Cron, to facilitate standardizing log management and backup scheduling
-- Minimal Docker image size (for CentOS 7): 519MB
-- Simple configuration via Dockerfile (fewer than 100 lines)
-- Successful build with only six details needing set in Dockerfile and three in the CLI 'docker run' command
+- Custom Automated Zimbra Backups
+- Syslog-NG to facilitate standardizing log management
+- Cron Scheduler, to facilitate the many built-in Zimbra Cron jobs
+- Minimal Dockerfile image size (for CentOS 7): 519MB
+- Excellent comments in short Dockerfile (roughly 60 lines)
+- Successful build with only **four** settings in Dockerfile and **three** in the CLI 'docker run' command
 - Heavily tested with hundreds of successful test validation builds
-- Does not require dnsmasq to function properly
+- Tested from both CentOS 7 and Ubuntu 19 Docker hosts
 
 # Host Preparations
 
 ## Disable SELinux
 
-It is strongly recommended to disable SELinux on your Docker host server. If you skip this step, be prepared to make SELinux modifications not covered by this project.
+It is strongly recommended to disable SELinux on your Docker host server. If you skip this step, be prepared to make SELinux modifications not covered by these instructions.
 
 ## Disable IPv6
 
-Zimbra's zmconfigd does not play well with IPv6 in a Docker environment. If you aren't specifically using IPv6, I would suggest you disable it on your Docker host.
+Zimbra's zmconfigd does not play well with IPv6 in a Docker environment. If you aren't specifically using IPv6, you should consider disabling it on your Docker host.
+
+## Uninstall any existing MTA
+
+CentOS and Ubuntu both will have a mail daemon (postfix or sendmail) that is installed by default. You will need to remove this before you will be able to run your Zimbra Docker image.
+
+```
+yum -y remove postfix
+apt-get remove postfix
+```
 
 ## Docker Installation
 
