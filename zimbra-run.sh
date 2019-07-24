@@ -1,14 +1,17 @@
 #!/bin/bash
+#PREINSTALL_DIR=/opt/zimbra-install
+# The HOSTNAME & DOMAIN are extracted from the system hostname, which is set via:
+#  --hostname CLI argument from the 'docker run' command
+HOSTNAME=$(hostname -f | cut -d. -f1)
+DOMAIN=$(hostname -f | cut -d. -f2-)
 
 # Declare Start/Stop Function
 function stop_start() {
-  # Fix any permissions issues that might exist
-  /opt/zimbra/libexec/zmfixperms
   echo "zimbra-run: Stopping Zimbra.." >> $DOCKER_SYSTEMLOGS
-  su - zimbra -c "zmcontrol stop && sleep 5"  >> $DOCKER_SYSTEMLOGS
+  /opt/zimbra/libexec/zmfixperms; su - zimbra -c "zmcontrol stop && sleep 5"  >> $DOCKER_SYSTEMLOGS
   # Make *SURE* all Zimbra processes are killed. A hung process would mean on restart it would not start cleanly.
-  pkill -u zimbra
-  echo "zimbra-run: Re-Starting Zimbra, LDAP First..!" >> $DOCKER_SYSTEMLOGS
+  if [[ `ps awwux | grep zimbra | grep -v grep` ]]; then pkill -u zimbra; fi
+  echo "zimbra-run: Re-Starting Zimbra.." >> $DOCKER_SYSTEMLOGS
   su - zimbra -c "zmcontrol start" >> $DOCKER_SYSTEMLOGS
 }
 
@@ -17,23 +20,21 @@ function stop_start() {
 if [[ -z $(ls -A /opt/zimbra) ]]; then sleep 3
     for i in {1..3}; do echo "******************************************" >> $DOCKER_SYSTEMLOGS; done
     echo "INSTALLING ZIMBRA COLLABORATION SOFTWARE.." >> $DOCKER_SYSTEMLOGS;
-    # Download Zimbra to our pre-installation staging directory
-    PREINSTALL_DIR=/opt/zimbra-install
-    CONFIGSCRIPT=$PREINSTALL_DIR/installZimbraScript
     # Disable IPv6 Entries in /etc/hosts
     cp /etc/hosts /etc/hosts2 && sed -i '2,6d' /etc/hosts2 && yes | cp /etc/hosts2 /etc/hosts
     
+    # Download Zimbra to our pre-installation staging directory
     wget -O $PREINSTALL_DIR/zimbra-zcs.tar.gz $ZIMBRAURL
     tar xzvf $PREINSTALL_DIR/zimbra-zcs.tar.gz -C $PREINSTALL_DIR/
 
     echo "zimbra-run: Creating Zimbra keystrokes (Auto-response) file" >> $DOCKER_SYSTEMLOGS && \
         printf "y\ny\ny\ny\ny\nn\ny\ny\ny\ny\ny\ny\ny\ny\nn\ny" > $PREINSTALL_DIR/installZimbra-keystrokes
-        
+    # Create random strings for various email addresses    
     RANDOMHAM=$(date +%s|sha256sum|base64|head -c 10); sleep 1
     RANDOMSPAM=$(date +%s|sha256sum|base64|head -c 10); sleep 1
     RANDOMQUARANTINE=$(date +%s|sha256sum|base64|head -c 10); sleep 1
     RANDOMGALSYNC=$(date +%s|sha256sum|base64|head -c 10)
-
+    # Create primary configuration file
 cat <<EOF >$PREINSTALL_DIR/installZimbraScript
 AVDOMAIN="$DOMAIN"
 AVUSER="admin@$DOMAIN"
@@ -145,18 +146,19 @@ EOF
     # BUGFIX: Docker-based Zimbra has bug with zmcontrol not properly starting LDAP service first.
     # This bugfix injects a manual ldap start right before the 'zmcontrol start' command is issued.
     # This ensures LDAP is started first and all services starting after it have this dependency met.
-    linenum=`grep -rne 'zmcontrol stop' /opt/zimbra/libexec/zmsetup.pl | cut -d: -f1`
-    LINE_TO_INSERT_AT=`expr $linenum + 1`
+    # Without this fix, Zimbra Installation fails steps of "Installing common zimlets" and "Creating galsync account for default domain"
+    linenum=`grep -rne 'zmcontrol stop' /opt/zimbra/libexec/zmsetup.pl | cut -d: -f1`; LINE_TO_INSERT_AT=`expr $linenum + 1`
     sed -i "${LINE_TO_INSERT_AT}i runAsZimbra (\"~/bin/ldap start\");" /opt/zimbra/libexec/zmsetup.pl
     
-    # Executing zmsetup.pl
     echo "zimbra-run: Running zmsetup.pl.." >> $DOCKER_SYSTEMLOGS
     /opt/zimbra/libexec/zmsetup.pl -c $PREINSTALL_DIR/installZimbraScript >> $DOCKER_SYSTEMLOGS
-
-    kill -9 `ps awwx | grep cron | grep -v grep | awk '{print $1}'`; sleep 3
+    # Force Cron to restart
+    kill -9 `ps awwx | grep cron | grep -v grep | awk '{print $1}'`; sleep 5
     for i in {1..2}; do echo "------------------------------------------" >> $DOCKER_SYSTEMLOGS; done
     echo "zimbra-run: COMPLETED INSTALLATION & INITIAL CONFIGURATION OF ZIMBRA" >> $DOCKER_SYSTEMLOGS
-    Whecho "zimbra-run: You may now hit CTRL-C to stop this running Docker image. Then issue your 'docker start' command to restart it in the background." >> $DOCKER_SYSTEMLOGS
+    echo "---" >> $DOCKER_SYSTEMLOGS; echo "Zimbra Admin URL: https://$HOSTNAME.$DOMAIN:7071" >> $DOCKER_SYSTEMLOGS
+    echo "Zimbra Webmail URL: https://$HOSTNAME.$DOMAIN" >> $DOCKER_SYSTEMLOGS
+    echo "---"  >> $DOCKER_SYSTEMLOGS; echo "zimbra-run: You may now hit CTRL-C to stop this running Docker image. Then issue your 'docker start' command to restart it in the background." >> $DOCKER_SYSTEMLOGS
 fi
 
 if [[ $1 == "-d" ]]; then
