@@ -28,6 +28,9 @@ RUN sed -i 's/system()/# system()/g' /etc/syslog-ng/syslog-ng.conf
 # This scripts either performs full automated install(if uninstalled) or starts Zimbra. 
 # Failed services are automatically restarted.
 COPY zimbra-run.sh /zimbra-run.sh
+# Copy in the Zimbra Cold Backup script
+COPY zimbra-backup.sh /zimbra-backup.sh
+RUN ln -s /zimbra-backup.sh /etc/cron.daily/zimbra-backup.sh
 
 # If you plan to examine or manipulate the Zimbra files outside the running Docker image, you may want to consider creating
 # the zimbra user with same UID as below on your Docker host to ensure directory listings properly map to the zimbra user.

@@ -8,7 +8,7 @@ This goal of this project is to make it simple and easy for anyone to create the
 - Fix for zmconfigd stopping or not starting, through disabling of IPv6
 - Auto-Restart of a single service if it is found stopped
 - Auto-Restart of all services if more than one is found stopped
-- Custom Automated Zimbra Backups
+- Custom automated daily extremely space-efficient Zimbra Backups
 - Syslog-NG to facilitate standardizing log management
 - Cron Scheduler, to facilitate the many built-in Zimbra Cron jobs
 - Minimal Dockerfile image size (for CentOS 7): 519MB

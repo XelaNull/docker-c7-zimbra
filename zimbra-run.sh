@@ -166,6 +166,18 @@ while :; do
   # Determine if one or many serveices are stopped
   STOPPED_COUNT=`su - zimbra -c "zmcontrol status | grep Stopped | wc -l"`
 
+  BACKUP_CHECK=`ps awwux | grep zimbra-backup | grep -v grep`
+  if [[ $BACKUP_CHECK != "" ]]; then
+    echo "zimbra-run: Detected backup running. Skipping loop."
+    STOPPED_COUNT=0
+  fi
+  
+  ZMCONTROL_CHECK=`ps awwux | grep zmcontrol | grep -v grep`
+  if [[ $ZMCONTROL_CHECK != "" ]]; then
+    echo "zimbra-run: Detected zmcontrol is currently being run. Skipping loop."
+    STOPPED_COUNT=0
+  fi
+
   # If one service is stopped, examine if we recently have tried to restart it.
   if [[ $STOPPED_COUNT == "1" ]]; then
     # Obtain the name of the one service that is stopped
