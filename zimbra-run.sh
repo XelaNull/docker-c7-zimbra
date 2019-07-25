@@ -153,6 +153,8 @@ EOF
   /opt/zimbra/libexec/zmsetup.pl -c $PREINSTALL_DIR/installZimbraScript >> $DOCKER_SYSTEMLOGS
   # Force Cron to reload configuration
   kill --signal HUP `ps awwx | grep cron | grep -v grep | awk '{print $1}'`;
+  echo "zimbra-run: Taking first initial backup" >> $DOCKER_SYSTEMLOGS
+  /zimbra-backup.sh
   for i in {1..2}; do echo "--------------------------------------------------" >> $DOCKER_SYSTEMLOGS; done
   echo "COMPLETED INSTALLATION ZIMBRA COLLABORATION SERVER" >> $DOCKER_SYSTEMLOGS
   echo "Zimbra Webmail URL: https://$HOSTNAME.$DOMAIN" >> $DOCKER_SYSTEMLOGS
