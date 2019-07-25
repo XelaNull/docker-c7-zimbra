@@ -7,7 +7,7 @@ This goal of this project is to make it simple and easy for anyone to create the
 - Fix for Zimlet installation & GALSYNC account creation failure during Zimbra install
 - Fix for zmconfigd stopping or not starting, through disabling of IPv6
 - Auto-Restart of a single service if it is found stopped
-- Auto-Restart of all services if more than one is found stopped
+- Auto-Restart of all services if more than one is found unexpectedly stopped
 - Custom automated daily extremely space-efficient Zimbra Backups
 - Syslog-NG to facilitate standardizing log management
 - Cron Scheduler, to facilitate the many built-in Zimbra Cron jobs
@@ -71,8 +71,8 @@ When you run the command below, it is going to run it within your shell so that 
 
 ```
 docker run -i --name=CENTOS-ZIMBRA \
-  -p25:25/tcp -p80:80/tcp -p110:110/tcp -p143:143/tcp \
-  -p443:443/tcp -p465:465/tcp -p587:587/tcp -p7071:7071/tcp \
+  -p25:25/tcp -p80:80/tcp -p110:110/tcp -p143:143/tcp -p443:443/tcp \
+  -p465:465/tcp -p587:587/tcp -p993:993/tcp -p995:995/tcp -p7071:7071/tcp \
   --sysctl net.ipv6.conf.all.disable_ipv6=1 \
   --hostname=YOUR.SERVER.FQDN.HERE \
   -v /root/opt-zimbra:/opt/zimbra \
@@ -90,8 +90,10 @@ docker run -i --name=CENTOS-ZIMBRA \
 - 110 - POP3
 - 143 - IMAP
 - 443 - HTTPS (for Zimbra Webmail URL)
-- 465 - IMAPS (Secure IMAP)
-- 587 - SMTPS (Secure SMTP)
+- 465 - SMTPS over TLS (Incoming)
+- 587 - Mail submission over TLS
+- 993 - IMAPS over TLS
+- 995 - POP3S over TLS
 - 7071 - HTTPS (for Zimbra Admin URL)
 
 ## Stopping or Starting the image
