@@ -20,7 +20,7 @@ ENV PREINSTALL_DIR=/opt/zimbra-install
 ENV DOCKER_SYSTEMLOGS=/proc/1/fd/1
 
 # Update YUM, then Install Pre-requisites
-RUN yum -y --setopt=tsflags=nodocs update && yum -y --setopt=tsflags=nodocs install epel-release wget perl openssh-server telnet net-tools which && \
+RUN yum -y --setopt=tsflags=nodocs update && yum -y --setopt=tsflags=nodocs install epel-release wget perl openssh-server telnet net-tools which rsync && \
     yum -y --setopt=tsflags=nodocs install supervisor cronie openssh sudo perl-Sys-Syslog perl-Digest-MD5 syslog-ng sysstat unzip libaio nmap-ncat
 # Disable Syslog-NG attempting to log kernel messages which arent available to a Docker container
 RUN sed -i 's/system()/# system()/g' /etc/syslog-ng/syslog-ng.conf
@@ -56,6 +56,6 @@ RUN /gen_sup.sh crond "/usr/sbin/crond -n" >> /etc/supervisord.conf && \
     /gen_sup.sh zimbra "/zimbra-run.sh -d" >> /etc/supervisord.conf
 RUN yum -y update && yum clean all && rm -rf /tmp/* && rm -rf /var/tmp/* && rm -rf /var/cache/* && rm -rf /var/log/* 
 
-EXPOSE 25 80 443 465 587 110 143 993 995 7071 8080 8443 8735 8736
+EXPOSE 25 80 110 143 443 465 587 993 995 7071
 VOLUME ["/opt/zimbra"]
 ENTRYPOINT ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]
